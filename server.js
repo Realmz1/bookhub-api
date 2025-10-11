@@ -15,22 +15,49 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 8080;
 
-app.use(cors());
+// ==================== CORS FIX ====================
+// Explicit CORS config to support Swagger UI and Render
+app.use(
+  cors({
+    origin: "*", // Allow all origins (for demo & Swagger); restrict to specific domains in production
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+    credentials: false,
+  })
+);
+// Handle preflight (OPTIONS) requests globally
+app.options("*", cors());
+
+// ==================== MIDDLEWARE ====================
 app.use(express.json());
 app.use(morgan("dev"));
 
-app.get("/", (req, res) => res.json({ message: "Welcome to BookHub API" }));
+// ==================== ROOT ENDPOINT ====================
+app.get("/", (req, res) => {
+  res.status(200).json({ message: "Welcome to BookHub API" });
+});
 
+// ==================== ROUTES ====================
 app.use("/api/auth", authRoutes);
 app.use("/api/books", bookRoutes);
 app.use("/api/authors", authorRoutes);
 app.use("/api/contacts", contactRoutes);
 app.use("/api/users", userRoutes);
 
+// ==================== SWAGGER ====================
 swaggerDocs(app);
 
-connectDB().then(() => {
-  app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
-});
+// ==================== DATABASE + SERVER START ====================
+connectDB()
+  .then(() => {
+    app.listen(PORT, () => {
+      console.log(`🚀 Server running on port ${PORT}`);
+      console.log(`📘 Swagger available at http://localhost:${PORT}/api-docs`);
+    });
+  })
+  .catch((err) => {
+    console.error("❌ Database connection failed:", err.message);
+    process.exit(1);
+  });
 
 export default app;
