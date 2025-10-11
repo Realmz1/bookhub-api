@@ -16,17 +16,29 @@ const app = express();
 const PORT = process.env.PORT || 8080;
 
 // ==================== CORS FIX ====================
-// Explicit CORS config to support Swagger UI and Render
+// Explicit CORS config to support Swagger UI and Render proxy quirks
 app.use(
   cors({
-    origin: "*", // Allow all origins (for demo & Swagger); restrict to specific domains in production
+    origin: "*", // allow all origins (OK for demo; restrict later in production)
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
     credentials: false,
   })
 );
-// Handle preflight (OPTIONS) requests globally
-app.options("*", cors());
+
+// Manual CORS override (guaranteed fallback for Render Swagger)
+app.use((req, res, next) => {
+  res.header("Access-Control-Allow-Origin", "*");
+  res.header("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS");
+  res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
+
+  // Respond immediately to preflight requests
+  if (req.method === "OPTIONS") {
+    return res.sendStatus(200);
+  }
+
+  next();
+});
 
 // ==================== MIDDLEWARE ====================
 app.use(express.json());
