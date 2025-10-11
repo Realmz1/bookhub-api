@@ -12,7 +12,7 @@ const options = {
     },
     servers: [
       {
-        url: "https://bookhub-api.onrender.com",
+        url: "https://bookhub-api-k0cq.onrender.com/",
         description: "Production",
       },
       {
