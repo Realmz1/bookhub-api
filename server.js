@@ -2,14 +2,18 @@ import express from "express";
 import cors from "cors";
 import morgan from "morgan";
 import dotenv from "dotenv";
+import session from "express-session";
 import { connectDB } from "./db/connect.js";
 import { swaggerDocs } from "./swagger.js";
+import passport from "./config/passport.js";
 
 import authRoutes from "./routes/auth.js";
 import bookRoutes from "./routes/books.js";
 import authorRoutes from "./routes/authors.js";
 import contactRoutes from "./routes/contacts.js";
 import userRoutes from "./routes/users.js";
+import reviewRoutes from "./routes/reviews.js";
+import publisherRoutes from "./routes/publishers.js";
 
 dotenv.config();
 const app = express();
@@ -44,6 +48,23 @@ app.use((req, res, next) => {
 app.use(express.json());
 app.use(morgan("dev"));
 
+// Session configuration for passport
+app.use(
+  session({
+    secret: process.env.SESSION_SECRET || "your-secret-key-change-in-production",
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      secure: process.env.NODE_ENV === "production",
+      maxAge: 24 * 60 * 60 * 1000, // 24 hours
+    },
+  })
+);
+
+// Initialize passport
+app.use(passport.initialize());
+app.use(passport.session());
+
 // ==================== ROOT ENDPOINT ====================
 app.get("/", (req, res) => {
   res.status(200).json({ message: "Welcome to BookHub API" });
@@ -55,21 +76,26 @@ app.use("/api/books", bookRoutes);
 app.use("/api/authors", authorRoutes);
 app.use("/api/contacts", contactRoutes);
 app.use("/api/users", userRoutes);
+app.use("/api/reviews", reviewRoutes);
+app.use("/api/publishers", publisherRoutes);
 
 // ==================== SWAGGER ====================
 swaggerDocs(app);
 
 // ==================== DATABASE + SERVER START ====================
-connectDB()
-  .then(() => {
-    app.listen(PORT, () => {
-      console.log(`🚀 Server running on port ${PORT}`);
-      console.log(`📘 Swagger available at http://localhost:${PORT}/api-docs`);
+// Only start the server if not in test mode
+if (process.env.NODE_ENV !== "test") {
+  connectDB()
+    .then(() => {
+      app.listen(PORT, () => {
+        console.log(`🚀 Server running on port ${PORT}`);
+        console.log(`📘 Swagger available at http://localhost:${PORT}/api-docs`);
+      });
+    })
+    .catch((err) => {
+      console.error("❌ Database connection failed:", err.message);
+      process.exit(1);
     });
-  })
-  .catch((err) => {
-    console.error("❌ Database connection failed:", err.message);
-    process.exit(1);
-  });
+}
 
 export default app;

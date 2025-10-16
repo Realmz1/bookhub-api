@@ -1,5 +1,6 @@
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
+import { ObjectId } from "mongodb";
 import { getDB } from "../db/connect.js";
 
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -100,6 +101,156 @@ export async function getProfile(req, res) {
   } catch (err) {
     console.error("❌ Profile Error:", err);
     res.status(500).json({ error: "Internal server error." });
+  }
+}
+
+// ======================= GOOGLE OAUTH CALLBACK =======================
+export async function googleAuthCallback(req, res) {
+  try {
+    // User is authenticated via passport, generate JWT token
+    const user = req.user;
+
+    const token = jwt.sign(
+      { id: user._id, email: user.email, role: user.role },
+      JWT_SECRET,
+      { expiresIn: "1h" }
+    );
+
+    // Check if this is coming from Swagger UI OAuth flow
+    const referer = req.get('Referer') || '';
+    const isSwaggerUI = referer.includes('/api-docs');
+
+    // For Swagger UI OAuth2 flow - return HTML that will handle the token
+    if (isSwaggerUI || req.query.mode === "swagger") {
+      return res.send(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Authentication Successful</title>
+          <style>
+            body {
+              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+              display: flex;
+              justify-content: center;
+              align-items: center;
+              min-height: 100vh;
+              margin: 0;
+              background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            }
+            .container {
+              background: white;
+              padding: 40px;
+              border-radius: 10px;
+              box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+              max-width: 500px;
+              text-align: center;
+            }
+            .success-icon {
+              font-size: 64px;
+              margin-bottom: 20px;
+            }
+            h1 { color: #333; margin-bottom: 20px; }
+            .token-container {
+              background: #f5f5f5;
+              padding: 20px;
+              border-radius: 5px;
+              margin: 20px 0;
+              word-break: break-all;
+              font-family: monospace;
+              font-size: 12px;
+              max-height: 150px;
+              overflow-y: auto;
+            }
+            .user-info {
+              background: #e3f2fd;
+              padding: 15px;
+              border-radius: 5px;
+              margin: 20px 0;
+              text-align: left;
+            }
+            .copy-btn {
+              background: #667eea;
+              color: white;
+              border: none;
+              padding: 10px 20px;
+              border-radius: 5px;
+              cursor: pointer;
+              font-size: 16px;
+              margin: 10px 5px;
+            }
+            .copy-btn:hover { background: #5568d3; }
+            .back-btn {
+              background: #4caf50;
+              color: white;
+              border: none;
+              padding: 10px 20px;
+              border-radius: 5px;
+              cursor: pointer;
+              font-size: 16px;
+              margin: 10px 5px;
+              text-decoration: none;
+              display: inline-block;
+            }
+            .back-btn:hover { background: #45a049; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="success-icon">✅</div>
+            <h1>Authentication Successful!</h1>
+            <div class="user-info">
+              <strong>Name:</strong> ${user.name}<br>
+              <strong>Email:</strong> ${user.email}<br>
+              <strong>Role:</strong> ${user.role}
+            </div>
+            <p><strong>Your JWT Token:</strong></p>
+            <div class="token-container" id="token">${token}</div>
+            <button class="copy-btn" onclick="copyToken()">📋 Copy Token</button>
+            <a href="/api-docs" class="back-btn">← Back to Swagger</a>
+            <p style="margin-top: 20px; font-size: 14px; color: #666;">
+              To use this token in Swagger:<br>
+              1. Click the "Authorize" button<br>
+              2. Paste the token in the "bearerAuth" field<br>
+              3. Click "Authorize"
+            </p>
+          </div>
+          <script>
+            function copyToken() {
+              const token = document.getElementById('token').textContent;
+              navigator.clipboard.writeText(token).then(() => {
+                alert('Token copied to clipboard!');
+              });
+            }
+          </script>
+        </body>
+        </html>
+      `);
+    }
+
+    // For API testing, return JSON
+    if (req.query.mode === "api") {
+      return res.status(200).json({
+        message: "Google authentication successful.",
+        token,
+        user: { name: user.name, email: user.email, role: user.role },
+      });
+    }
+
+    // For web app flow, redirect to frontend with token in query
+    const frontendUrl = process.env.FRONTEND_URL;
+    if (frontendUrl) {
+      return res.redirect(`${frontendUrl}/auth/callback?token=${token}`);
+    }
+
+    // Default: return JSON if no frontend URL is configured
+    return res.status(200).json({
+      message: "Google authentication successful.",
+      token,
+      user: { name: user.name, email: user.email, role: user.role },
+    });
+  } catch (err) {
+    console.error("❌ Google Auth Callback Error:", err);
+    res.status(500).json({ error: "Authentication failed." });
   }
 }
 

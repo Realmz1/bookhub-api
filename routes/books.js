@@ -1,6 +1,7 @@
 import express from "express";
-import { getBooks, createBook, updateBook, deleteBook } from "../controllers/booksController.js";
+import { getBooks, getBookById, createBook, updateBook, deleteBook } from "../controllers/booksController.js";
 import { authMiddleware } from "../controllers/authController.js";
+import { validateCreateBook, validateUpdateBook } from "../middleware/validators.js";
 
 const router = express.Router();
 
@@ -69,6 +70,35 @@ router.get("/", getBooks);
 
 /**
  * @swagger
+ * /api/books/{id}:
+ *   get:
+ *     summary: Get a single book by ID
+ *     tags: [Books]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: The book ID
+ *     responses:
+ *       200:
+ *         description: A single book
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Book'
+ *       400:
+ *         description: Invalid ID format
+ *       404:
+ *         description: Book not found
+ *       500:
+ *         description: Server error
+ */
+router.get("/:id", getBookById);
+
+/**
+ * @swagger
  * /api/books:
  *   post:
  *     summary: Add a new book (requires login)
@@ -91,7 +121,7 @@ router.get("/", getBooks);
  *       500:
  *         description: Server error
  */
-router.post("/", authMiddleware, createBook);
+router.post("/", authMiddleware, validateCreateBook, createBook);
 
 /**
  * @swagger
@@ -126,7 +156,7 @@ router.post("/", authMiddleware, createBook);
  *       500:
  *         description: Server error
  */
-router.put("/:id", authMiddleware, updateBook);
+router.put("/:id", authMiddleware, validateUpdateBook, updateBook);
 
 /**
  * @swagger

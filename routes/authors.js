@@ -7,6 +7,7 @@ import {
   deleteAuthor,
 } from "../controllers/authorsController.js";
 import { authMiddleware } from "../controllers/authController.js";
+import { validateCreateAuthor, validateUpdateAuthor } from "../middleware/validators.js";
 
 const router = express.Router();
 
@@ -134,7 +135,7 @@ router.get("/:id", getAuthorById);
  *       500:
  *         description: Server error
  */
-router.post("/", authMiddleware, createAuthor);
+router.post("/", authMiddleware, validateCreateAuthor, createAuthor);
 
 /**
  * @swagger
@@ -169,7 +170,7 @@ router.post("/", authMiddleware, createAuthor);
  *       500:
  *         description: Server error
  */
-router.put("/:id", authMiddleware, updateAuthor);
+router.put("/:id", authMiddleware, validateUpdateAuthor, updateAuthor);
 
 /**
  * @swagger

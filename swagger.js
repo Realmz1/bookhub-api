@@ -8,7 +8,7 @@ const options = {
       title: "BookHub API",
       version: "1.0.0",
       description:
-        "BookHub is a full CRUD + Auth API built with Node.js, Express, and MongoDB. It provides secure routes for managing books, authors, contacts, and users with JWT authentication, validation, and error handling.",
+        "BookHub is a full CRUD + Auth API built with Node.js, Express, and MongoDB. It provides secure routes for managing books, authors, contacts, and users with JWT authentication (including Google OAuth), validation, and error handling.",
     },
     servers: [
       {
@@ -16,7 +16,7 @@ const options = {
         description: "Production",
       },
       {
-        url: "http://localhost:8080",
+        url: "http://localhost:5500",
         description: "Local Development",
       },
     ],
@@ -29,6 +29,20 @@ const options = {
           bearerFormat: "JWT",
           description:
             "Enter your JWT token in the format: **Bearer &lt;token&gt;**",
+        },
+        googleOAuth: {
+          type: "oauth2",
+          description: "Google OAuth 2.0 authentication",
+          flows: {
+            authorizationCode: {
+              authorizationUrl: "/api/auth/google",
+              tokenUrl: "/api/auth/google/callback",
+              scopes: {
+                "profile": "Access your basic profile information",
+                "email": "Access your email address",
+              },
+            },
+          },
         },
       },
       schemas: {
@@ -176,46 +190,109 @@ const options = {
             },
             email: {
               type: "string",
+              format: "email",
               description: "User's email address (must be unique)",
             },
             password: {
               type: "string",
-              description: "User's password (hashed on storage)",
+              description: "User's hashed password (stored securely)",
             },
             role: {
               type: "string",
+              enum: ["user", "admin"],
+              default: "user",
               description:
                 "User role (e.g., 'user' or 'admin'). Determines access permissions.",
             },
-            token: {
+            createdAt: {
               type: "string",
-              description: "JWT token assigned upon login",
+              format: "date-time",
+              description: "Account creation timestamp",
             },
           },
           example: {
+            _id: "507f1f77bcf86cd799439011",
             name: "Jane Smith",
             email: "jane@example.com",
-            password: "securePassword123",
+            password: "$2b$10$abcdefghijklmnopqrstuvwxyz",
             role: "user",
-            token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+            createdAt: "2024-01-15T08:30:00.000Z",
           },
         },
-        LoginRequest: {
+        Review: {
           type: "object",
-          required: ["email", "password"],
+          required: ["bookTitle", "reviewer", "rating"],
           properties: {
-            email: {
+            _id: {
               type: "string",
-              description: "User's email address",
+              description: "Auto-generated MongoDB ID",
             },
-            password: {
+            bookTitle: {
               type: "string",
-              description: "User's plain text password",
+              description: "Title of the book being reviewed",
+            },
+            reviewer: {
+              type: "string",
+              description: "Name of the person reviewing the book",
+            },
+            rating: {
+              type: "integer",
+              minimum: 1,
+              maximum: 5,
+              description: "Rating from 1 to 5 stars",
+            },
+            comment: {
+              type: "string",
+              description: "Written review or comment about the book",
+            },
+            createdAt: {
+              type: "string",
+              format: "date-time",
+              description: "Date when the review was created",
             },
           },
           example: {
-            email: "john@example.com",
-            password: "securePassword123",
+            bookTitle: "Atomic Habits",
+            reviewer: "John Doe",
+            rating: 5,
+            comment: "An excellent guide to building better habits. Highly recommend!",
+          },
+        },
+        Publisher: {
+          type: "object",
+          required: ["name", "country"],
+          properties: {
+            _id: {
+              type: "string",
+              description: "Auto-generated MongoDB ID",
+            },
+            name: {
+              type: "string",
+              description: "Name of the publishing house",
+            },
+            country: {
+              type: "string",
+              description: "Country where the publisher is based",
+            },
+            founded: {
+              type: "integer",
+              description: "Year the publisher was founded",
+            },
+            website: {
+              type: "string",
+              description: "Official website URL of the publisher",
+            },
+            createdAt: {
+              type: "string",
+              format: "date-time",
+              description: "Date when the record was created",
+            },
+          },
+          example: {
+            name: "Penguin Random House",
+            country: "United States",
+            founded: 2013,
+            website: "https://www.penguinrandomhouse.com",
           },
         },
       },
@@ -233,6 +310,21 @@ const options = {
 const swaggerSpec = swaggerJSDoc(options);
 
 export function swaggerDocs(app) {
-  app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+  // Swagger UI configuration with OAuth2 support
+  const swaggerUiOptions = {
+    swaggerOptions: {
+      persistAuthorization: true,
+      oauth2RedirectUrl: `${process.env.NODE_ENV === 'production'
+        ? 'https://bookhub-api-k0cq.onrender.com'
+        : 'http://localhost:5500'}/api-docs/oauth2-redirect.html`,
+      initOAuth: {
+        clientId: process.env.GOOGLE_CLIENT_ID,
+        scopes: ["profile", "email"],
+        usePkceWithAuthorizationCodeGrant: true,
+      },
+    },
+  };
+
+  app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec, swaggerUiOptions));
   console.log("📘 Swagger Docs available at /api-docs");
 }
